@@ -15,10 +15,40 @@ const GithubProvider = ({children}) => {
 
   //Requests
   const [requests, setRequests] = useState(0);
-  const [loading, setLoading] = useState(false);
 
   //Errors
   const [error,setError] = useState({show:false, msg:""});
+
+  //Search Users Request
+  const searchGithubUser = async(user)=>{
+    toggleError(); //So that error message removed when a valid user is search after error
+
+    const response = await axios(`${rootUrl}/users/${user}`)
+    .catch(err => console.log(err));
+
+    if(response){
+      setGithubUser(response.data);
+      const {login} = response.data;
+
+      //Used to solve the issue of delay in fetching the different requests
+      await Promise.allSettled([
+        axios(`${rootUrl}/users/${login}/repos?per_page=100`),
+        axios(`${rootUrl}/users/${login}/followers?per_page=100`)
+      ])
+      .then((results) => {
+        const [repos, followers] = results;
+        if(repos.status === 'fulfilled'){
+          setRepos(repos.value.data);
+        }
+        if(followers.status === 'fulfilled'){
+          setFollowers(followers.value.data);
+        }
+      })
+
+    }else{
+      toggleError(true,"User not found");
+    }
+  }
 
   //Check Rate
   const checkRequests = () => {
@@ -34,7 +64,7 @@ const GithubProvider = ({children}) => {
   }
 
   //Errors
-  function toggleError(show,msg){
+  function toggleError(show=false,msg=''){
     setError({
       show,
       msg
@@ -44,7 +74,7 @@ const GithubProvider = ({children}) => {
   useEffect(checkRequests,[])
 
   return (
-    <GithubContext.Provider value={{githubUser, repos, followers, requests, error}}>
+    <GithubContext.Provider value={{githubUser, repos, followers, requests, error, searchGithubUser}}>
       {children}
     </GithubContext.Provider>
   );
